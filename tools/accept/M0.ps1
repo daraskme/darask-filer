@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     M0(リポジトリ基盤 + フィクスチャ生成器)の受け入れ基準を検証する(docs/07 M0)。
@@ -8,6 +8,14 @@
     3. 100k ツリー生成が 60 秒未満であること
     4. --images 50000 が壊れていない画像(Windows API でデコード可能な BMP)を生成すること
 #>
+# CI 用: build-and-test ジョブで既にビルド・テスト済みの場合、このスクリプト内での重複実行を
+# 省略する(単体実行時は指定不要 — 常にビルド・テストする)。
+# 注意: BOM なし UTF-8 の .ps1 は Windows PowerShell 5.1 が ANSI コードページで読むため、
+# 日本語コメントを param() の括弧の中に置くとパーサーがバイト列を誤読して構文が壊れる
+# (実機で確認 — スイッチが常に $false になった)。コメントは必ず param() の外に置くこと。
+param(
+    [switch]$SkipBuildAndTest
+)
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repoRoot = Resolve-Path "$PSScriptRoot\..\.."
@@ -32,13 +40,17 @@ function Check($name, [bool]$condition) {
     }
 }
 
-Write-Host "=== 1. dotnet build ==="
-& $dotnet build "$repoRoot\darask-filer.slnx" -c Release
-Check "dotnet build succeeds" ($LASTEXITCODE -eq 0)
+if ($SkipBuildAndTest) {
+    Write-Host "=== 1-2. dotnet build/test (呼び出し元で検証済みのためスキップ) ===" -ForegroundColor Yellow
+} else {
+    Write-Host "=== 1. dotnet build ==="
+    & $dotnet build "$repoRoot\darask-filer.slnx" -c Release
+    Check "dotnet build succeeds" ($LASTEXITCODE -eq 0)
 
-Write-Host "`n=== 2. dotnet test ==="
-& $dotnet test "$repoRoot\darask-filer.slnx" -c Release --no-build
-Check "dotnet test succeeds" ($LASTEXITCODE -eq 0)
+    Write-Host "`n=== 2. dotnet test ==="
+    & $dotnet test "$repoRoot\darask-filer.slnx" -c Release --no-build
+    Check "dotnet test succeeds" ($LASTEXITCODE -eq 0)
+}
 
 Write-Host "`n=== 3. mkfixture determinism ==="
 $out1 = Join-Path $testDataDir "det1"

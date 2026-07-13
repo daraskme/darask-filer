@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     M2(アイコン + サムネイルパイプライン)の受け入れ基準を検証する(docs/07 M2)。
@@ -17,6 +17,14 @@
     - アイコングリッド(VirtualizingWrapPanel)のスクロール(500 件で滑らかな動作を確認)
     - desktop.ini カスタムフォルダーアイコン(Desktop/Downloads/iCloudDrive で実アイコン表示を確認)
 #>
+# CI 用: build-and-test ジョブで既にビルド・テスト済みの場合、このスクリプト内での重複実行を
+# 省略する(単体実行時は指定不要 — 常にビルド・テストする)。
+# 注意: BOM なし UTF-8 の .ps1 は Windows PowerShell 5.1 が ANSI コードページで読むため、
+# 日本語コメントを param() の括弧の中に置くとパーサーがバイト列を誤読して構文が壊れる
+# (実機で確認 — スイッチが常に $false になった)。コメントは必ず param() の外に置くこと。
+param(
+    [switch]$SkipBuildAndTest
+)
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $repoRoot = Resolve-Path "$PSScriptRoot\..\.."
@@ -40,11 +48,15 @@ function Check($name, [bool]$condition) {
     }
 }
 
-Write-Host "=== 1. dotnet build + test (ShellSmokeTests 含む) ==="
-& $dotnet build "$repoRoot\darask-filer.slnx" -c Release
-Check "dotnet build succeeds" ($LASTEXITCODE -eq 0)
-& $dotnet test "$repoRoot\darask-filer.slnx" -c Release --no-build
-Check "dotnet test succeeds" ($LASTEXITCODE -eq 0)
+if ($SkipBuildAndTest) {
+    Write-Host "=== 1. dotnet build + test (呼び出し元で検証済みのためスキップ) ===" -ForegroundColor Yellow
+} else {
+    Write-Host "=== 1. dotnet build + test (ShellSmokeTests 含む) ==="
+    & $dotnet build "$repoRoot\darask-filer.slnx" -c Release
+    Check "dotnet build succeeds" ($LASTEXITCODE -eq 0)
+    & $dotnet test "$repoRoot\darask-filer.slnx" -c Release --no-build
+    Check "dotnet test succeeds" ($LASTEXITCODE -eq 0)
+}
 
 Write-Host "`n=== 2. mkfixture --images でサムネイル用フィクスチャ生成 ==="
 $imgDir = Join-Path $testDataDir "images"

@@ -16,3 +16,6 @@ tools/mkfixture/out/
 # OS
 Thumbs.db
 desktop.ini
+
+# Claude Code local session state
+.claude/

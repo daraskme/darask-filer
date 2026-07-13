@@ -55,7 +55,10 @@ jobs:
   # (docs/01 §5 M17 リリースゲート「全マイルストーン受け入れスクリプトが CI/ローカルで green」)。
   accept:
     needs: build-and-test
-    if: github.event_name == 'push'
+    # needs: だけではジョブレベルの if: を上書きすると暗黙の success() ガードが失われ、
+    # build-and-test が失敗しても accept が走ってしまう(実機検証で確認済みの不具合) — 明示的に
+    # needs.build-and-test.result を条件へ含める。
+    if: github.event_name == 'push' && needs.build-and-test.result == 'success'
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -70,17 +73,25 @@ jobs:
           cache: true
           cache-dependency-path: "**/*.csproj"
 
+      # tools/accept/Mxx.ps1 はそれぞれ単体でも実行できるよう内部で dotnet build/test を
+      # 行うが、CI ではここで一度だけビルド・テストし、-SkipBuildAndTest で各スクリプトの
+      # 重複ビルドを省略する(M0-M17 と増えるほど「1回で済むはずが N 回走る」問題になるため)。
+      - name: Build + test (once, shared by all milestone scripts below)
+        run: |
+          dotnet build darask-filer.slnx -c Release
+          dotnet test darask-filer.slnx -c Release --no-build
+
       - name: M0 — リポジトリ基盤 + フィクスチャ生成器
         shell: pwsh
-        run: ./tools/accept/M0.ps1
+        run: ./tools/accept/M0.ps1 -SkipBuildAndTest
 
       - name: M1 — アプリシェル + 高速列挙
         shell: pwsh
-        run: ./tools/accept/M1.ps1
+        run: ./tools/accept/M1.ps1 -SkipBuildAndTest
 
       - name: M2 — アイコン + サムネイルパイプライン
         shell: pwsh
-        run: ./tools/accept/M2.ps1
+        run: ./tools/accept/M2.ps1 -SkipBuildAndTest
 
       - name: Upload testdata on failure
         if: failure()
