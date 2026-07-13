@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>DaraskFiler</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Darask.Shell\Darask.Shell.csproj" />
+    <ProjectReference Include="..\Darask.Enumeration\Darask.Enumeration.csproj" />
+    <ProjectReference Include="..\Darask.Index\Darask.Index.csproj" />
+    <ProjectReference Include="..\Darask.History\Darask.History.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="VirtualizingWrapPanel" Version="2.5.2" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>

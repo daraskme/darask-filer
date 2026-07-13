@@ -1,0 +1,126 @@
+<UserControl x:Class="Darask.App.FolderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel">
+    <Grid>
+        <!-- CLAUDE.md 規則4: CanContentScroll=True + VirtualizationMode=Recycling + ScrollUnit=Pixel は必須セット -->
+        <ListView x:Name="ListViewControl"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  VirtualizingPanel.ScrollUnit="Pixel"
+                  VirtualizingPanel.CacheLength="1,1"
+                  VirtualizingPanel.CacheLengthUnit="Page"
+                  ScrollViewer.CanContentScroll="True"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  SelectionMode="Extended"
+                  SelectionChanged="ListViewControl_SelectionChanged"
+                  MouseDoubleClick="ListViewControl_MouseDoubleClick"
+                  KeyDown="ListViewControl_KeyDown"
+                  MouseRightButtonUp="EntryList_MouseRightButtonUp"
+                  MouseDown="EntryList_MouseDown">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="6,8" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="名前" Width="320">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <!-- アイコン/サムネイルは可視行のみ遅延ロード(docs/07 M2)。
+                                     仮想化 ListView が可視行だけコンテナ化するので、Loaded/Unloaded に
+                                     配線するだけで「可視行優先 + 非可視行キャンセル」が自然に実現する。 -->
+                                <StackPanel Orientation="Horizontal"
+                                            Loaded="EntryRow_Loaded" Unloaded="EntryRow_Unloaded">
+                                    <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,6,0" />
+                                    <Grid>
+                                        <TextBlock x:Name="NameText" Text="{Binding DisplayName}" />
+                                        <TextBox x:Name="NameEdit" Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Visibility="Collapsed" MinWidth="140"
+                                                 IsVisibleChanged="RenameBox_IsVisibleChanged" KeyDown="RenameBox_KeyDown" LostFocus="RenameBox_LostFocus" />
+                                    </Grid>
+                                </StackPanel>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                                        <Setter TargetName="NameText" Property="Visibility" Value="Collapsed" />
+                                        <Setter TargetName="NameEdit" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="更新日時" Width="160" DisplayMemberBinding="{Binding LastWriteTimeDisplay}" />
+                    <GridViewColumn Header="種類" Width="120" DisplayMemberBinding="{Binding TypeDisplay}" />
+                    <GridViewColumn Header="サイズ" Width="110" DisplayMemberBinding="{Binding SizeDisplay}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- アイコングリッドビュー(docs/06 §2, docs/07 M2)。VirtualizingWrapPanel は可変サイズ対応。 -->
+        <ListBox x:Name="IconGridControl" Visibility="Collapsed" Background="Transparent" BorderThickness="0"
+                 Padding="0,0,14,0"
+                 VirtualizingPanel.VirtualizationMode="Recycling"
+                 VirtualizingPanel.ScrollUnit="Pixel"
+                 VirtualizingPanel.CacheLength="1,1"
+                 VirtualizingPanel.CacheLengthUnit="Page"
+                 ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 SelectionMode="Extended"
+                 SelectionChanged="ListViewControl_SelectionChanged"
+                 MouseDoubleClick="ListViewControl_MouseDoubleClick"
+                 KeyDown="ListViewControl_KeyDown"
+                 MouseRightButtonUp="EntryList_MouseRightButtonUp"
+                 MouseDown="EntryList_MouseDown"
+                 PreviewMouseWheel="IconGridControl_PreviewMouseWheel"
+                 SizeChanged="IconGridControl_SizeChanged">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="6" />
+                    <Setter Property="Margin" Value="4" />
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <vwp:VirtualizingWrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <!-- v1 は固定 48px アイコン。Ctrl+ホイールでの連続ズーム(docs/01 §4)は
+                     複数サイズのテンプレート切替として post-M2 で拡張する。 -->
+                <DataTemplate>
+                    <StackPanel Width="88" Loaded="EntryRow_Loaded" Unloaded="EntryRow_Unloaded">
+                        <Image Source="{Binding Icon}" Width="48" Height="48" HorizontalAlignment="Center" />
+                        <Grid>
+                            <TextBlock x:Name="NameText" Text="{Binding DisplayName}" TextWrapping="Wrap" TextAlignment="Center"
+                                       HorizontalAlignment="Center" />
+                            <TextBox x:Name="NameEdit" Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Visibility="Collapsed" HorizontalAlignment="Stretch" TextAlignment="Center"
+                                     IsVisibleChanged="RenameBox_IsVisibleChanged" KeyDown="RenameBox_KeyDown" LostFocus="RenameBox_LostFocus" />
+                        </Grid>
+                    </StackPanel>
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsRenaming}" Value="True">
+                            <Setter TargetName="NameText" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="NameEdit" Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- VirtualizingWrapPanel(サードパーティ)は IScrollInfo の Extent 通知を ScrollViewer に
+             正しく伝えず、標準/Fluent いずれのスクロールバーも表示されないため、アイテム数から
+             独自算出したトラック/つまみを Border で自前描画する(docs/07 #19)。 -->
+        <Border x:Name="IconGridScrollTrack" Width="10" HorizontalAlignment="Right" Margin="0,2,2,2"
+                Background="#12808080" CornerRadius="5" Visibility="Collapsed"
+                MouseLeftButtonDown="IconGridScrollTrack_MouseLeftButtonDown">
+            <Border x:Name="IconGridScrollThumb" Width="6" HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Background="#80808080" CornerRadius="3"
+                    MouseLeftButtonDown="IconGridScrollThumb_MouseLeftButtonDown"
+                    MouseMove="IconGridScrollThumb_MouseMove"
+                    MouseLeftButtonUp="IconGridScrollThumb_MouseLeftButtonUp" />
+        </Border>
+    </Grid>
+</UserControl>

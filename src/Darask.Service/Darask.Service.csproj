@@ -1,0 +1,16 @@
+<!-- M9 で Microsoft.NET.Sdk.Worker + Microsoft.Extensions.Hosting.WindowsServices を追加する(docs/02 §1)。
+     M0-M8 は単純なコンソールとして骨格を保つ。 -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Darask.Service</RootNamespace>
+    <AssemblyName>DaraskFilerd</AssemblyName>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Darask.Ipc\Darask.Ipc.csproj" />
+  </ItemGroup>
+
+</Project>

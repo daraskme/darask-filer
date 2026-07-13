@@ -1,0 +1,18 @@
+<UserControl x:Class="Darask.App.StatusBarControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Border BorderThickness="0,1,0,0" Padding="8,4">
+        <Border.BorderBrush>
+            <SolidColorBrush Color="{DynamicResource ControlStrokeColorDefault}" />
+        </Border.BorderBrush>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ui:TextBlock x:Name="ItemCountText" Grid.Column="0" Text="0 個の項目" FontSize="12" />
+            <ui:TextBlock x:Name="SelectionSummaryText" Grid.Column="1" Text="" FontSize="12" Margin="16,0,0,0" />
+        </Grid>
+    </Border>
+</UserControl>

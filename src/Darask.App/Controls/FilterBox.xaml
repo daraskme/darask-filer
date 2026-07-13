@@ -1,0 +1,7 @@
+<UserControl x:Class="Darask.App.FilterBox"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <ui:TextBox x:Name="TextBoxControl" PlaceholderText="このフォルダーを絞り込み"
+                Icon="{ui:SymbolIcon Filter24}" TextChanged="TextBoxControl_TextChanged" />
+</UserControl>

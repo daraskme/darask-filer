@@ -1,0 +1,18 @@
+# Build outputs
+bin/
+obj/
+publish/
+*.user
+
+# Rider / VS
+.vs/
+.idea/
+*.suo
+
+# Fixture output (generated, not source)
+tools/mkfixture/out/
+/testdata/
+
+# OS
+Thumbs.db
+desktop.ini

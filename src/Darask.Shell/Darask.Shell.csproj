@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vanara.PInvoke.Shell32" Version="5.0.5" />
+    <PackageReference Include="Vanara.PInvoke.Ole" Version="5.0.5" />
+    <PackageReference Include="Vanara.Windows.Shell" Version="5.0.5" />
+  </ItemGroup>
+
+</Project>

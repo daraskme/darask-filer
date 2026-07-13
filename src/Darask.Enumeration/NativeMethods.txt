@@ -1,0 +1,17 @@
+NtQueryDirectoryFileEx
+FindFirstFileExW
+FindNextFileW
+FindClose
+StrCmpLogicalW
+CreateFileW
+CloseHandle
+ReadDirectoryChangesW
+GetFileAttributesW
+FILE_INFORMATION_CLASS
+FILE_FULL_DIR_INFORMATION
+FIND_FIRST_EX_FLAGS
+FILE_FLAGS_AND_ATTRIBUTES
+FILE_NOTIFY_CHANGE
+FILE_NOTIFY_INFORMATION
+FILE_ACTION
+CancelIoEx

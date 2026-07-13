@@ -1,0 +1,25 @@
+<UserControl x:Class="Darask.App.PreviewPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid>
+        <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5">
+            <ui:SymbolIcon Symbol="DocumentSearch24" FontSize="32" HorizontalAlignment="Center" />
+            <TextBlock Text="プレビューなし" HorizontalAlignment="Center" Margin="0,8,0,0" />
+        </StackPanel>
+
+        <Image x:Name="ImagePreview" Visibility="Collapsed" Stretch="Uniform" Margin="12" />
+
+        <ui:TextBox x:Name="TextPreview" Visibility="Collapsed" IsReadOnly="True" TextWrapping="NoWrap"
+                    AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                    FontFamily="Cascadia Mono, Consolas" Margin="8" BorderThickness="0" Background="Transparent" />
+
+        <StackPanel x:Name="GenericInfo" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    MaxWidth="220">
+            <Image x:Name="GenericIcon" Width="64" Height="64" Margin="0,0,0,10" HorizontalAlignment="Center" />
+            <TextBlock x:Name="GenericName" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="GenericMeta" HorizontalAlignment="Center" Opacity="0.6" FontSize="12" Margin="0,6,0,0" />
+        </StackPanel>
+    </Grid>
+</UserControl>

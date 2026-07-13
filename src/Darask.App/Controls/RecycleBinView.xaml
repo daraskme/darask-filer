@@ -1,0 +1,62 @@
+<UserControl x:Class="Darask.App.RecycleBinView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />   <!-- ツールバー -->
+            <RowDefinition Height="*" />      <!-- 一覧 -->
+            <RowDefinition Height="Auto" />   <!-- ステータス -->
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="8,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <ui:SymbolIcon Symbol="Delete24" VerticalAlignment="Center" Margin="4,0,8,0" FontSize="20" />
+                <TextBlock Text="ごみ箱" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,16,0" />
+                <ui:Button x:Name="RefreshButton" Click="RefreshButton_Click" ToolTip="更新 (F5)"
+                           Padding="8" Margin="0,0,2,0">
+                    <ui:SymbolIcon Symbol="ArrowClockwise24" />
+                </ui:Button>
+                <ui:Button x:Name="EmptyButton" Click="EmptyButton_Click" ToolTip="ごみ箱を空にする"
+                           Padding="8">
+                    <ui:SymbolIcon Symbol="Delete24" />
+                </ui:Button>
+            </StackPanel>
+        </Grid>
+
+        <ListView x:Name="ItemsList" Grid.Row="1"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  SelectionMode="Extended"
+                  MouseRightButtonUp="ItemsList_MouseRightButtonUp">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="6,8" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="名前" Width="260">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="{Binding IconSymbol}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="元の場所" Width="360" DisplayMemberBinding="{Binding OriginalPathDisplay}" />
+                    <GridViewColumn Header="削除日時" Width="160" DisplayMemberBinding="{Binding DeletedOnDisplay}" />
+                    <GridViewColumn Header="サイズ" Width="110" DisplayMemberBinding="{Binding SizeDisplay}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <TextBlock x:Name="StatusText" Grid.Row="2" Margin="12,4" Opacity="0.6" FontSize="12" />
+    </Grid>
+</UserControl>

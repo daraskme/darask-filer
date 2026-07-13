@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Darask.App/Darask.App.csproj" />
+    <Project Path="src/Darask.Shell/Darask.Shell.csproj" />
+    <Project Path="src/Darask.Enumeration/Darask.Enumeration.csproj" />
+    <Project Path="src/Darask.Index/Darask.Index.csproj" />
+    <Project Path="src/Darask.History/Darask.History.csproj" />
+    <Project Path="src/Darask.Service/Darask.Service.csproj" />
+    <Project Path="src/Darask.Ipc/Darask.Ipc.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Darask.Tests/Darask.Tests.csproj" />
+    <Project Path="tests/Darask.UiTests/Darask.UiTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/mkfixture/mkfixture.csproj" />
+    <Project Path="tools/bench/bench.csproj" />
+    <Project Path="tools/hang-ext/hang-ext.csproj" />
+  </Folder>
+</Solution>
