@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/*.csproj"
+
+      - name: Restore
+        run: dotnet restore darask-filer.slnx
+
+      - name: Build
+        run: dotnet build darask-filer.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test darask-filer.slnx -c Release --no-build --logger "console;verbosity=normal"
+
+      - name: mkfixture smoke test
+        run: |
+          dotnet run --project tools/mkfixture -c Release --no-build -- --profile 1000 --seed 42 --out testdata/ci-smoke --images 20
+
+      - name: Upload testdata on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-and-test-testdata
+          path: testdata/
+          retention-days: 5
+          if-no-files-found: ignore
+
+  # マイルストーン受け入れスクリプト(docs/07)。100k ファイル生成やソートベンチ等の実測を含み
+  # 数分かかるため、PR では実行せず main/master への push 時のみ実行する
+  # (docs/01 §5 M17 リリースゲート「全マイルストーン受け入れスクリプトが CI/ローカルで green」)。
+  accept:
+    needs: build-and-test
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: "**/*.csproj"
+
+      - name: M0 — リポジトリ基盤 + フィクスチャ生成器
+        shell: pwsh
+        run: ./tools/accept/M0.ps1
+
+      - name: M1 — アプリシェル + 高速列挙
+        shell: pwsh
+        run: ./tools/accept/M1.ps1
+
+      - name: M2 — アイコン + サムネイルパイプライン
+        shell: pwsh
+        run: ./tools/accept/M2.ps1
+
+      - name: Upload testdata on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-testdata
+          path: testdata/
+          retention-days: 5
+          if-no-files-found: ignore
