@@ -442,6 +442,23 @@ GitHub Actions での CI を実際にグリーンにするところまでを実�
   (154.5MB フォルダー / 65.9MB zip)。
 - GitHub Release v0.1.0 として zip を添付。
 
+### 第2ラウンド: gpt-5.6-sol (OpenRouter) 相互レビュー(v0.1.1)
+- Codex クォータ切れ後、ユーザーが OpenRouter 経由の `openai/gpt-5.6-sol` を整備
+  (`~/.codex/config.toml` の既定を OpenRouter に切替済み・キーは `~\.openrouter_key`。
+  **CLI 0.144.5 ではレガシー `[profiles.*]` テーブルが `--profile` と併用不可** —
+  既定設定がそのまま OpenRouter を向いているので `--profile` なしの `codex exec` で使う。
+  キーは実行時に環境変数 `OPENROUTER_API_KEY` へ注入)。
+- agentic レビュー 1 回 = 115,234 トークン(+疎通テスト 11,057)≈ **$1 前後**。
+- **10 件指摘 → 8 件採用・修正、2 件棄却**(棄却理由込みでコミット 0c83bf4 に記録)。
+  採用分の要点: JSON ストアのアトミック書き込み+破損 JSON 耐性(破損 session.json で
+  起動クラッシュし得た)、作業スペース適用の世代ガード(遅い UNC stat が新しい選択を
+  上書きし得た)、ロード完了前保存のマージ、新規作成のオフスレッド化+ FileMode.CreateNew、
+  古い Dispatcher コールバックの破棄ガード、グリッドラベル2行キャップ、ズーム時の
+  実体化行のみ列挙。
+- 棄却 2 件: ShellWorker STA 移行(本ファイル記載の実測デッドロックによる意図的逸脱 —
+  M3 で再検討)、OpenAs_RunDLL の引用符付け(rundll32 はカンマ以降を素通しするため
+  引用符はパスを壊す)。
+
 ### 開発環境の注意(再発)
 - **.NET 10 SDK がまたシステムから消えていた**(Program Files 側は 8.0.29/9.0.18 ランタイムのみ)。
   dotnet-install.ps1 で `%LOCALAPPDATA%\dotnet-10` に 10.0.301 を再インストール。開発ビルドの
