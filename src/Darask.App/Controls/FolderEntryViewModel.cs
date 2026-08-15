@@ -71,8 +71,9 @@ public sealed class FolderEntryViewModel(FileSystemEntry entry, string parentPat
 
     /// <summary>行が可視になった時に呼ぶ(FolderView の行 Loaded イベント)。バックグラウンドで
     /// 拡張子アイコン(高速)→サムネイル(低優先度)の順に取得し UI スレッドへディスパッチする。
-    /// <paramref name="thumbnailSize"/> はアイコングリッドのズームに応じた要求解像度。</summary>
-    public void BeginLoadIcon(int thumbnailSize = 64)
+    /// <paramref name="thumbnailSize"/> はアイコングリッドのズームに応じた要求解像度、
+    /// <paramref name="largeIcons"/> は 32px シェルアイコンを使うか(大きいズーム時のボケ軽減)。</summary>
+    public void BeginLoadIcon(int thumbnailSize = 64, bool largeIcons = false)
     {
         if (_iconLoaded) return;
         _iconLoaded = true;
@@ -86,7 +87,7 @@ public sealed class FolderEntryViewModel(FileSystemEntry entry, string parentPat
 
         System.Threading.Tasks.Task.Run(() =>
         {
-            var extIcon = IconService.GetExtensionIcon(name, isDirectory, large: false);
+            var extIcon = IconService.GetExtensionIcon(name, isDirectory, large: largeIcons);
             if (token.IsCancellationRequested) return;
             if (extIcon is not null)
             {
@@ -104,7 +105,7 @@ public sealed class FolderEntryViewModel(FileSystemEntry entry, string parentPat
             {
                 // desktop.ini の IconResource カスタムフォルダーアイコンを反映するため実パスで再取得
                 // (docs/07 M2)。USEFILEATTRIBUTES を外すとシェルの標準ロジックがこれを解決する。
-                var realIcon = IconService.GetRealIcon(fullPath, large: false);
+                var realIcon = IconService.GetRealIcon(fullPath, large: largeIcons);
                 if (!token.IsCancellationRequested && realIcon is not null)
                 {
                     Application.Current?.Dispatcher.BeginInvoke(() =>
@@ -118,7 +119,7 @@ public sealed class FolderEntryViewModel(FileSystemEntry entry, string parentPat
             if (Path.GetExtension(name).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
             {
                 // .lnk は実パス経由でないとショートカット矢印オーバーレイが付かない(docs/07 M2)。
-                var linkIcon = IconService.GetRealIcon(fullPath, large: false);
+                var linkIcon = IconService.GetRealIcon(fullPath, large: largeIcons);
                 if (!token.IsCancellationRequested && linkIcon is not null)
                 {
                     Application.Current?.Dispatcher.BeginInvoke(() =>

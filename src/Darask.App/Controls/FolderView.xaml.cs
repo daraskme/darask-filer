@@ -471,11 +471,14 @@ public partial class FolderView : UserControl
         ? IconSize <= 64 ? 64 : IconSize <= 128 ? 128 : 256
         : 64;
 
+    // 64px 超のズームでは 16px シェルアイコンの拡大ボケを避けるため 32px 版を要求する。
+    private bool UseLargeIcons => _viewMode == FolderViewMode.IconGrid && IconSize > 64;
+
     private void EntryRow_Loaded(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: FolderEntryViewModel vm })
         {
-            vm.BeginLoadIcon(CurrentThumbnailSize);
+            vm.BeginLoadIcon(CurrentThumbnailSize, UseLargeIcons);
         }
     }
 
@@ -561,13 +564,14 @@ public partial class FolderView : UserControl
         if (IconGridControl.ItemsSource is not IEnumerable<FolderEntryViewModel> vms) return;
 
         int thumbSize = CurrentThumbnailSize;
+        bool large = UseLargeIcons;
         var generator = IconGridControl.ItemContainerGenerator;
         foreach (var vm in vms)
         {
             vm.CancelLoad();
             if (generator.ContainerFromItem(vm) is ListBoxItem)
             {
-                vm.BeginLoadIcon(thumbSize);
+                vm.BeginLoadIcon(thumbSize, large);
             }
         }
     }
