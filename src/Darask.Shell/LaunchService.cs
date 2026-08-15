@@ -52,9 +52,12 @@ public static class LaunchService
     /// <summary>指定フォルダーでターミナルを開く。Windows Terminal 優先、なければ PowerShell。</summary>
     public static void OpenTerminal(string folderPath)
     {
+        // 末尾の \ は閉じ引用符をエスケープしてしまう(`-d "C:\"` → 引数が壊れる)ため、
+        // 引用符内で \\ に倍化して リテラルの \ として渡す。
+        string quotable = folderPath.EndsWith('\\') ? folderPath + "\\" : folderPath;
         try
         {
-            Process.Start(new ProcessStartInfo("wt.exe", $"-d \"{folderPath}\"") { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo("wt.exe", $"-d \"{quotable}\"") { UseShellExecute = true });
         }
         catch (Win32Exception)
         {

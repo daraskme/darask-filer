@@ -48,9 +48,13 @@ public static class EntrySorter
     }
 
     /// <summary>「種類」列 — 拡張子(大文字小文字無視)→ 自然順名前の複合キー。
-    /// Span ベースで拡張子を切り出すため文字列アロケーションなし(規則9の精神に準拠)。</summary>
+    /// Span ベースで拡張子を切り出すため文字列アロケーションなし(規則9の精神に準拠)。
+    /// フォルダーは全て同一種類(「ファイル フォルダー」)なので名前のみで比較する
+    /// (エクスプローラー準拠 — ドット入りフォルダー名を拡張子扱いしない)。</summary>
     private static int CompareByType(FileSystemEntry a, FileSystemEntry b)
     {
+        if (a.IsDirectory) return NaturalSort.Compare(a.Name, b.Name);
+
         var extA = System.IO.Path.GetExtension(a.Name.AsSpan());
         var extB = System.IO.Path.GetExtension(b.Name.AsSpan());
         int c = extA.CompareTo(extB, StringComparison.OrdinalIgnoreCase);

@@ -86,7 +86,22 @@ public partial class FolderView : UserControl
             _columnTitles[column] = (string)column.Header;
         }
         UpdateSortGlyphs();
+
+        // TextSearch(タイプアヘッド)・ScrollIntoView・キーボード移動など ScrollViewer を
+        // 直接動かす経路でも自前スクロールバーのつまみが追従するよう、ScrollChanged を購読する
+        // (ScrollViewer はテンプレート適用後にしか取れないため Loaded で配線)。
+        IconGridControl.Loaded += (_, _) =>
+        {
+            if (_iconGridScrollHooked || FindDescendantScrollViewer(IconGridControl) is not { } sv) return;
+            _iconGridScrollHooked = true;
+            sv.ScrollChanged += (_, args) =>
+            {
+                if (_viewMode == FolderViewMode.IconGrid && !_draggingThumb) UpdateIconGridThumb(args.VerticalOffset);
+            };
+        };
     }
+
+    private bool _iconGridScrollHooked;
 
     public string? CurrentPath => _currentPath;
     public bool CanGoBack => _backStack.Count > 0;
@@ -304,10 +319,21 @@ public partial class FolderView : UserControl
 
         if (selectedNames is not null)
         {
-            foreach (var vm in vms)
+            // 1件追加ごとに SelectionChanged → 全選択の合計サイズ再計算、では大量選択時に
+            // O(n²) になるため、復元中はサマリー更新を抑止して最後に1回だけ行う。
+            _restoringSelection = true;
+            try
             {
-                if (selectedNames.Contains(vm.Name)) ActiveControl.SelectedItems.Add(vm);
+                foreach (var vm in vms)
+                {
+                    if (selectedNames.Contains(vm.Name)) ActiveControl.SelectedItems.Add(vm);
+                }
             }
+            finally
+            {
+                _restoringSelection = false;
+            }
+            UpdateSelectionSummary(ActiveControl);
         }
         if (samePath && previousOffset > 0)
         {
@@ -471,8 +497,8 @@ public partial class FolderView : UserControl
         ? IconSize <= 64 ? 64 : IconSize <= 128 ? 128 : 256
         : 64;
 
-    // 64px 超のズームでは 16px シェルアイコンの拡大ボケを避けるため 32px 版を要求する。
-    private bool UseLargeIcons => _viewMode == FolderViewMode.IconGrid && IconSize > 64;
+    // 64px 以上のズームでは 16px シェルアイコンの拡大ボケを避けるため 32px 版を要求する。
+    private bool UseLargeIcons => _viewMode == FolderViewMode.IconGrid && IconSize >= 64;
 
     private void EntryRow_Loaded(object sender, RoutedEventArgs e)
     {
@@ -499,10 +525,17 @@ public partial class FolderView : UserControl
         }
     }
 
+    private bool _restoringSelection;
+
     // ListViewControl と IconGridControl(どちらも ListBox 派生)で共有するハンドラ。
     private void ListViewControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var control = (ListBox)sender;
+        if (_restoringSelection) return;
+        UpdateSelectionSummary((ListBox)sender);
+    }
+
+    private void UpdateSelectionSummary(ListBox control)
+    {
         int total = control.Items.Count;
         int selected = control.SelectedItems.Count;
         long selectedSize = 0;

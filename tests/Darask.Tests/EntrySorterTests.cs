@@ -49,6 +49,23 @@ public class EntrySorterTests
     }
 
     [Fact]
+    public void Sort_ByType_OrdersDirectoriesByNameIgnoringDots()
+    {
+        // フォルダーは全て「ファイル フォルダー」種別 — ドット入り名を拡張子扱いせず
+        // 名前の自然順のみで並べる(エクスプローラー準拠)。
+        FileSystemEntry[] entries =
+        [
+            Dir("zebra"),
+            Dir("app.backup"),
+            Dir("data.old"),
+        ];
+
+        EntrySorter.Sort(entries, SortKey.Type, SortDirection.Ascending);
+
+        Assert.Equal(["app.backup", "data.old", "zebra"], entries.Select(e => e.Name).ToArray());
+    }
+
+    [Fact]
     public void Sort_ByType_ExtensionlessFilesSortBeforeExtensions()
     {
         FileSystemEntry[] entries =

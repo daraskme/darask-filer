@@ -94,10 +94,19 @@ public partial class NavigationPane : UserControl
         }
     }
 
+    // ファイル読み込みは UI スレッドで行わない(CLAUDE.md 規則1)。
     private void LoadWorkspaces()
     {
-        foreach (var ws in WorkspaceStore.Load()) _workspaces.Add(ws);
         WorkspaceList.ItemsSource = _workspaces;
+        _ = System.Threading.Tasks.Task.Run(() =>
+        {
+            var loaded = WorkspaceStore.Load();
+            if (loaded.Count == 0) return;
+            Dispatcher.BeginInvoke(() =>
+            {
+                foreach (var ws in loaded) _workspaces.Add(ws);
+            });
+        });
     }
 
     private void PersistWorkspaces() => WorkspaceStore.Save(_workspaces);
@@ -160,6 +169,7 @@ public partial class NavigationPane : UserControl
         {
             string? newName = NameInputDialog.Show(Window.GetWindow(this)!, "新しい名前を入力してください", ws.Name);
             if (newName is null || string.Equals(newName, ws.Name, StringComparison.Ordinal)) return;
+            if (IndexOfWorkspace(newName) >= 0) return; // 別の既存スペースと同名になる変更は受け付けない(重複防止)
             int index = IndexOfWorkspace(ws.Name);
             if (index >= 0)
             {

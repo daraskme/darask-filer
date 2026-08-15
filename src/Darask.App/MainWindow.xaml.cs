@@ -48,18 +48,37 @@ public partial class MainWindow : FluentWindow
 
     private static string DefaultInitialPath() => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-    /// <summary>前回終了時のタブ構成を復元する。復元できるタブがなければ既定の1タブで開始。</summary>
-    private void RestoreSession()
+    /// <summary>前回終了時のタブ構成を復元する。復元できるタブがなければ既定の1タブで開始。
+    /// ファイル読み込みと存在チェックは stat 系 I/O(到達不能なネットワークパスでは秒単位で
+    /// ブロックし得る)のため UI スレッドで行わない(CLAUDE.md 規則1)。</summary>
+    private async void RestoreSession()
     {
-        var session = SessionStore.Load();
-        var valid = session?.Tabs.Where(t => System.IO.Directory.Exists(t.Path)).ToList();
-        if (valid is not { Count: > 0 })
+        var restored = await Task.Run(() =>
+        {
+            var session = SessionStore.Load();
+            if (session is null) return null;
+            var valid = session.Tabs.Where(t => System.IO.Directory.Exists(t.Path)).ToList();
+            return valid.Count > 0 ? new TabSnapshot(valid, MapActiveIndex(session.Tabs, session.ActiveIndex, valid)) : null;
+        });
+
+        if (restored is null)
         {
             AddTab(DefaultInitialPath());
             return;
         }
 
-        OpenTabSet(valid, session!.ActiveIndex);
+        OpenTabSet(restored.Tabs, restored.ActiveIndex);
+    }
+
+    /// <summary>存在しないパスの除去後もアクティブタブが同じタブを指すようインデックスを引き直す。</summary>
+    private static int MapActiveIndex(List<SessionTab> original, int activeIndex, List<SessionTab> filtered)
+    {
+        if (activeIndex >= 0 && activeIndex < original.Count)
+        {
+            int mapped = filtered.IndexOf(original[activeIndex]);
+            if (mapped >= 0) return mapped;
+        }
+        return 0;
     }
 
     /// <summary>現在のフォルダータブ構成のスナップショット(ごみ箱等の特殊タブは含めない)。</summary>
@@ -76,10 +95,15 @@ public partial class MainWindow : FluentWindow
         return new TabSnapshot(tabs, activeIndex);
     }
 
-    /// <summary>作業スペースを開く: 現在の全タブを新しいタブ構成で置き換える(ユーザー要望機能)。</summary>
-    private void ApplyWorkspace(Workspace workspace)
+    /// <summary>作業スペースを開く: 現在の全タブを新しいタブ構成で置き換える(ユーザー要望機能)。
+    /// 存在チェックは RestoreSession 同様バックグラウンドで行う(CLAUDE.md 規則1)。</summary>
+    private async void ApplyWorkspace(Workspace workspace)
     {
-        var valid = workspace.Tabs.Where(t => System.IO.Directory.Exists(t.Path)).ToList();
+        var (valid, activeIndex) = await Task.Run(() =>
+        {
+            var tabs = workspace.Tabs.Where(t => System.IO.Directory.Exists(t.Path)).ToList();
+            return (tabs, MapActiveIndex(workspace.Tabs, workspace.ActiveIndex, tabs));
+        });
         if (valid.Count == 0)
         {
             System.Windows.MessageBox.Show("この作業スペースのフォルダーはいずれも存在しません。", "darask-filer",
@@ -91,7 +115,7 @@ public partial class MainWindow : FluentWindow
         // 一瞬もタブゼロ状態を作らないため)。
         var oldTabs = _tabs.ToList();
         _recycleBinTab = null;
-        OpenTabSet(valid, workspace.ActiveIndex);
+        OpenTabSet(valid, activeIndex);
 
         foreach (var t in oldTabs)
         {

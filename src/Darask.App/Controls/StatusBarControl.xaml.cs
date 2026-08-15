@@ -44,7 +44,9 @@ public partial class StatusBarControl : UserControl
             return;
         }
 
-        if (string.Equals(root, _driveRoot, StringComparison.OrdinalIgnoreCase)) return;
+        // 同一ドライブ内の移動でも毎回取り直す(大きなファイル操作後に古い空き容量を
+        // 見せ続けないため)。GetDiskFreeSpaceEx は十分安価で、応答の鮮度ガードには
+        // _driveRoot の一致確認だけ残す。
         _driveRoot = root;
 
         string captured = root;
