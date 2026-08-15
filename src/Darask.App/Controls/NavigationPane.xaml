@@ -9,7 +9,33 @@
             <RowDefinition Height="Auto" />   <!-- 履歴(左下、docs/07 #26) -->
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="8,8,8,4">
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" MaxHeight="440">
+        <StackPanel Margin="8,8,8,4">
+            <!-- 既定ピン: デスクトップ〜ビデオ + 個人用フォルダー + 検出されたクラウド同期
+                 フォルダー(iCloud/MEGA/Google Drive 等)を常時表示する(ユーザー要望)。 -->
+            <ListBox x:Name="PinnedList" BorderThickness="0" Background="Transparent" Margin="0,0,0,10"
+                     PreviewMouseLeftButtonUp="PinnedList_PreviewMouseLeftButtonUp">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="4,6" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Grid.Column="0" Symbol="{Binding Symbol}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding DisplayName}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
             <Border x:Name="RecycleBinRow" Padding="4,6" Margin="0,0,0,10" CornerRadius="4" Cursor="Hand"
                     Background="Transparent" MouseLeftButtonUp="RecycleBinRow_MouseLeftButtonUp">
                 <StackPanel Orientation="Horizontal">
@@ -79,6 +105,7 @@
                 </ListBox.ItemTemplate>
             </ListBox>
         </StackPanel>
+        </ScrollViewer>
 
         <TreeView x:Name="Tree" Grid.Row="1" BorderThickness="0" Background="Transparent"
                   TreeViewItem.Expanded="TreeViewItem_Expanded"

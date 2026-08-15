@@ -11,6 +11,7 @@ namespace Darask.App;
 /// </summary>
 public sealed record QuickAccessNode(string DisplayName, string FullPath);
 public sealed record HistoryNode(string DisplayName, string FullPath);
+public sealed record KnownFolderNode(string DisplayName, string FullPath, Wpf.Ui.Controls.SymbolRegular Symbol);
 
 public partial class NavigationPane : UserControl
 {
@@ -27,13 +28,70 @@ public partial class NavigationPane : UserControl
     private readonly ObservableCollection<HistoryNode> _history = [];
     private readonly ObservableCollection<Workspace> _workspaces = [];
 
+    private readonly ObservableCollection<KnownFolderNode> _pinned = [];
+
     public NavigationPane()
     {
         InitializeComponent();
         LoadDrives();
+        LoadPinnedFolders();
         LoadWorkspaces();
         LoadQuickAccess();
         LoadHistory();
+    }
+
+    /// <summary>既定フォルダー(デスクトップ〜ビデオ・個人用)+ 検出されたクラウド同期フォルダーを
+    /// 常時ピン表示する(ユーザー要望)。Directory.Exists は stat 系 I/O のため UI スレッドで
+    /// 呼ばない(CLAUDE.md 規則1) — バックグラウンドで検出して結果だけディスパッチする。</summary>
+    private void LoadPinnedFolders()
+    {
+        PinnedList.ItemsSource = _pinned;
+
+        _ = System.Threading.Tasks.Task.Run(() =>
+        {
+            var found = new List<KnownFolderNode>();
+            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // 同名候補(iCloud の別綴り等)は最初に実在したものだけ採用する。
+            void AddIfExists(string? path, string name, Wpf.Ui.Controls.SymbolRegular symbol)
+            {
+                if (path is not { Length: > 0 } || seenNames.Contains(name) || !Directory.Exists(path)) return;
+                seenNames.Add(name);
+                found.Add(new KnownFolderNode(name, path, symbol));
+            }
+
+            string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            AddIfExists(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "デスクトップ", Wpf.Ui.Controls.SymbolRegular.Desktop24);
+            AddIfExists(Darask.Shell.KnownFolderService.GetDownloadsPath() ?? Path.Combine(profile, "Downloads"), "ダウンロード", Wpf.Ui.Controls.SymbolRegular.ArrowDownload24);
+            AddIfExists(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ドキュメント", Wpf.Ui.Controls.SymbolRegular.Document24);
+            AddIfExists(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "ピクチャ", Wpf.Ui.Controls.SymbolRegular.Image24);
+            AddIfExists(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "ミュージック", Wpf.Ui.Controls.SymbolRegular.MusicNote224);
+            AddIfExists(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "ビデオ", Wpf.Ui.Controls.SymbolRegular.Video24);
+            AddIfExists(profile, "個人用フォルダー", Wpf.Ui.Controls.SymbolRegular.Person24);
+
+            // クラウド同期フォルダー(存在検出ベース。ベンダーごとに既定の配置候補を順に試す)。
+            AddIfExists(Environment.GetEnvironmentVariable("OneDrive"), "OneDrive", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "iCloudDrive"), "iCloud Drive", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "iCloud Drive"), "iCloud Drive", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "Google Drive"), "Google Drive", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "GoogleDrive"), "Google Drive", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "Google ドライブ"), "Google Drive", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "MEGA"), "MEGA", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "Documents", "MEGA"), "MEGA", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+            AddIfExists(Path.Combine(profile, "Dropbox"), "Dropbox", Wpf.Ui.Controls.SymbolRegular.Cloud24);
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                foreach (var node in found) _pinned.Add(node);
+            });
+        });
+    }
+
+    private void PinnedList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is FrameworkElement { DataContext: KnownFolderNode node })
+        {
+            PathSelected?.Invoke(node.FullPath);
+        }
     }
 
     private void LoadWorkspaces()
