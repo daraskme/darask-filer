@@ -32,6 +32,29 @@ public partial class FolderView : UserControl
     private bool _draggingThumb;
     private double _dragStartMouseY;
     private double _dragStartOffset;
+    private string? _lastBuiltPath;
+    private readonly Dictionary<GridViewColumn, SortKey> _columnSortKeys = [];
+    private readonly Dictionary<GridViewColumn, string> _columnTitles = [];
+
+    // アイコングリッドのズーム段階(Ctrl+ホイール、docs/01 §4 の「小〜特大」連続ズーム相当)。
+    private static readonly double[] IconZoomLevels = [32, 48, 64, 96, 128, 192, 256];
+    private int _iconZoomIndex = 1;
+
+    public static readonly DependencyProperty IconSizeProperty = DependencyProperty.Register(
+        nameof(IconSize), typeof(double), typeof(FolderView), new PropertyMetadata(48.0));
+    public double IconSize
+    {
+        get => (double)GetValue(IconSizeProperty);
+        set => SetValue(IconSizeProperty, value);
+    }
+
+    public static readonly DependencyProperty IconItemWidthProperty = DependencyProperty.Register(
+        nameof(IconItemWidth), typeof(double), typeof(FolderView), new PropertyMetadata(88.0));
+    public double IconItemWidth
+    {
+        get => (double)GetValue(IconItemWidthProperty);
+        set => SetValue(IconItemWidthProperty, value);
+    }
 
     public event Action<string>? PathChanged;
     public event Action<int, int, long>? SelectionSummaryChanged;
@@ -51,6 +74,18 @@ public partial class FolderView : UserControl
 
         ListViewControl.AddHandler(GridViewColumnHeader.ClickEvent, new RoutedEventHandler(ColumnHeader_Click));
         MouseDown += FolderView_MouseDown;
+
+        // 列 → ソートキーの対応(ヘッダー文字列にソートグリフを付けるため、文字列一致ではなく
+        // GridViewColumn インスタンスで対応付ける)。XAML の列順と一致させること。
+        var gridView = (GridView)ListViewControl.View;
+        SortKey[] keys = [SortKey.Name, SortKey.LastWriteTime, SortKey.Type, SortKey.Size];
+        for (int i = 0; i < keys.Length && i < gridView.Columns.Count; i++)
+        {
+            var column = gridView.Columns[i];
+            _columnSortKeys[column] = keys[i];
+            _columnTitles[column] = (string)column.Header;
+        }
+        UpdateSortGlyphs();
     }
 
     public string? CurrentPath => _currentPath;
@@ -205,7 +240,19 @@ public partial class FolderView : UserControl
             _sortKey = key;
             _sortDirection = SortDirection.Ascending;
         }
+        UpdateSortGlyphs();
         ApplyFilterAndSort();
+    }
+
+    private void UpdateSortGlyphs()
+    {
+        foreach (var (column, key) in _columnSortKeys)
+        {
+            string title = _columnTitles[column];
+            column.Header = key == _sortKey
+                ? title + (_sortDirection == SortDirection.Ascending ? " ▲" : " ▼")
+                : title;
+        }
     }
 
     private void ApplyFilterAndSort()
@@ -216,6 +263,25 @@ public partial class FolderView : UserControl
         // ほぼ確実に競合し、対策なしだと編集ボックスが一覧再構築で即座に消えてしまう。
         var renaming = (ActiveControl.ItemsSource as IEnumerable<FolderEntryViewModel>)
             ?.FirstOrDefault(v => v.IsRenaming);
+
+        // 同一フォルダー内での再構築(RDCW 自動更新・フィルター・トグル・ソート変更)では
+        // 選択とスクロール位置を保持する(Codex ブレインストーム #7)。別フォルダーへの
+        // ナビゲーションでは保持しない(先頭から表示するのがエクスプローラー準拠)。
+        bool samePath = string.Equals(_lastBuiltPath, _currentPath, StringComparison.OrdinalIgnoreCase);
+        _lastBuiltPath = _currentPath;
+        HashSet<string>? selectedNames = null;
+        double previousOffset = 0;
+        if (samePath)
+        {
+            if (ActiveControl.SelectedItems.Count > 0)
+            {
+                selectedNames = ActiveControl.SelectedItems.Cast<FolderEntryViewModel>()
+                    .Select(v => v.Name).ToHashSet(StringComparer.Ordinal);
+            }
+            previousOffset = _viewMode == FolderViewMode.IconGrid
+                ? FindDescendantScrollViewer(IconGridControl)?.VerticalOffset ?? 0
+                : FindDescendantScrollViewer(ListViewControl)?.VerticalOffset ?? 0;
+        }
 
         IEnumerable<FileSystemEntry> query = _allEntries;
         if (!_showHidden) query = query.Where(e => !e.IsHidden);
@@ -235,6 +301,25 @@ public partial class FolderView : UserControl
         ActiveControl.ItemsSource = vms;
         SelectionSummaryChanged?.Invoke(vms.Count, 0, 0);
         UpdateIconGridScrollBar();
+
+        if (selectedNames is not null)
+        {
+            foreach (var vm in vms)
+            {
+                if (selectedNames.Contains(vm.Name)) ActiveControl.SelectedItems.Add(vm);
+            }
+        }
+        if (samePath && previousOffset > 0)
+        {
+            // ItemsSource 差し替え直後は仮想化パネルがまだレイアウトされておらずオフセット設定が
+            // 無視されるため、レイアウトパス完了後に復元する。
+            double offset = previousOffset;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            {
+                if (_viewMode == FolderViewMode.IconGrid) ScrollIconGridTo(offset);
+                else FindDescendantScrollViewer(ListViewControl)?.ScrollToVerticalOffset(offset);
+            });
+        }
 
         if (renaming is not null && vms.FirstOrDefault(v => v.Name == renaming.Name) is { } restored)
         {
@@ -276,8 +361,8 @@ public partial class FolderView : UserControl
             return;
         }
 
-        const double itemWidth = 96;  // StackPanel Width=88 + ItemContainerStyle Margin 4+4
-        const double itemHeight = 100; // アイコン48 + 2行テキスト + Padding/Margin
+        double itemWidth = IconItemWidth + 8;  // StackPanel Width + ItemContainerStyle Margin 4+4
+        double itemHeight = IconSize + 52;     // アイコン + 2行テキスト + Padding/Margin(48px 時の実測 100 に整合)
         int itemCount = IconGridControl.Items.Count;
         int columns = Math.Max(1, (int)(IconGridControl.ActualWidth / itemWidth));
         int rows = (int)Math.Ceiling(itemCount / (double)columns);
@@ -381,11 +466,16 @@ public partial class FolderView : UserControl
         _watcher = null;
     }
 
+    // ズームに応じたサムネイルの要求サイズ(64/128/256 の3段階で丸めてキャッシュ効率を保つ)。
+    private int CurrentThumbnailSize => _viewMode == FolderViewMode.IconGrid
+        ? IconSize <= 64 ? 64 : IconSize <= 128 ? 128 : 256
+        : 64;
+
     private void EntryRow_Loaded(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: FolderEntryViewModel vm })
         {
-            vm.BeginLoadIcon();
+            vm.BeginLoadIcon(CurrentThumbnailSize);
         }
     }
 
@@ -399,16 +489,10 @@ public partial class FolderView : UserControl
 
     private void ColumnHeader_Click(object sender, RoutedEventArgs e)
     {
-        if (e.OriginalSource is GridViewColumnHeader { Column.Header: string header })
+        if (e.OriginalSource is GridViewColumnHeader { Column: { } column }
+            && _columnSortKeys.TryGetValue(column, out var key))
         {
-            var key = header switch
-            {
-                "名前" => SortKey.Name,
-                "サイズ" => SortKey.Size,
-                "更新日時" => SortKey.LastWriteTime,
-                _ => (SortKey?)null,
-            };
-            if (key is { } k) SortBy(k);
+            SortBy(key);
         }
     }
 
@@ -429,12 +513,62 @@ public partial class FolderView : UserControl
 
     // VirtualizingWrapPanel(サードパーティ)は IScrollInfo のオフセット設定はできるが
     // マウスホイールの委譲を実装していないため、ScrollViewer を直接操作する。
+    // Ctrl+ホイールはアイコンサイズのズーム(docs/01 §4)。
     private void IconGridControl_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            ApplyIconZoom(_iconZoomIndex + Math.Sign(e.Delta));
+            e.Handled = true;
+            return;
+        }
+
         if (sender is DependencyObject d && FindDescendantScrollViewer(d) is { } sv)
         {
             ScrollIconGridTo(sv.VerticalOffset - e.Delta / 2.0);
             e.Handled = true;
+        }
+    }
+
+    private void ApplyIconZoom(int newIndex)
+    {
+        newIndex = Math.Clamp(newIndex, 0, IconZoomLevels.Length - 1);
+        if (newIndex == _iconZoomIndex) return;
+        _iconZoomIndex = newIndex;
+
+        double size = IconZoomLevels[newIndex];
+        IconSize = size;
+        IconItemWidth = size + 40; // 48px 時の実測値 88 に整合するテキスト余白
+        UpdateIconGridScrollBar();
+        ReloadRealizedIcons();
+    }
+
+    /// <summary>セッション/作業スペース復元用 — 指定サイズに最も近いズーム段階を適用する。</summary>
+    public void SetIconZoom(double size)
+    {
+        int best = 0;
+        for (int i = 1; i < IconZoomLevels.Length; i++)
+        {
+            if (Math.Abs(IconZoomLevels[i] - size) < Math.Abs(IconZoomLevels[best] - size)) best = i;
+        }
+        ApplyIconZoom(best);
+    }
+
+    /// <summary>ズーム変更後、実体化済み(可視)の行だけサムネイルを新しい解像度で取り直す。
+    /// 未実体化の行はロード済みフラグをリセットするだけで、次に可視化された時に新解像度で読む。</summary>
+    private void ReloadRealizedIcons()
+    {
+        if (IconGridControl.ItemsSource is not IEnumerable<FolderEntryViewModel> vms) return;
+
+        int thumbSize = CurrentThumbnailSize;
+        var generator = IconGridControl.ItemContainerGenerator;
+        foreach (var vm in vms)
+        {
+            vm.CancelLoad();
+            if (generator.ContainerFromItem(vm) is ListBoxItem)
+            {
+                vm.BeginLoadIcon(thumbSize);
+            }
         }
     }
 
@@ -453,31 +587,114 @@ public partial class FolderView : UserControl
     private void ListViewControl_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         var control = (ListBox)sender;
-        if (control.SelectedItem is FolderEntryViewModel { IsDirectory: true } vm && _currentPath is not null)
+        // 空白部分のダブルクリックで選択中フォルダーへ入ってしまわないよう、実際に行の上で
+        // ダブルクリックされた時だけ反応する(エクスプローラー準拠)。
+        if (e.OriginalSource is not DependencyObject d
+            || ItemsControl.ContainerFromElement(control, d) is not ListBoxItem { DataContext: FolderEntryViewModel vm })
         {
-            Navigate(Path.Combine(_currentPath, vm.Name));
+            return;
         }
-        // ファイル起動(ShellExecuteEx 既定動詞)は M3 で実装する。
+
+        if (vm.IsDirectory) Navigate(vm.FullPath);
+        else Darask.Shell.LaunchService.Open(vm.FullPath);
     }
 
     private void ListViewControl_KeyDown(object sender, KeyEventArgs e)
     {
-        bool alt = Keyboard.Modifiers == ModifierKeys.Alt;
+        // インライン名前変更中の TextBox からのバブリングでショートカットが誤発火しないようガード
+        // (対策前は編集中に Delete を押すとファイル削除が発火する実バグがあった)。
+        if (e.OriginalSource is TextBox) return;
+
+        var control = (ListBox)sender;
+        var mods = Keyboard.Modifiers;
+        bool alt = mods == ModifierKeys.Alt;
+        bool ctrl = mods == ModifierKeys.Control;
+        bool ctrlShift = mods == (ModifierKeys.Control | ModifierKeys.Shift);
+
         if (alt && e.SystemKey == Key.Left) { GoBack(); e.Handled = true; }
         else if (alt && e.SystemKey == Key.Right) { GoForward(); e.Handled = true; }
         else if (alt && e.SystemKey == Key.Up) { GoUp(); e.Handled = true; }
+        else if (alt && e.SystemKey == Key.Return)
+        {
+            var paths = SelectedPaths(control);
+            if (paths.Count > 0) Darask.Shell.PropertiesService.ShowProperties(paths, OwnerHwnd());
+            else if (_currentPath is not null) Darask.Shell.PropertiesService.ShowProperties([_currentPath], OwnerHwnd());
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Return && mods == ModifierKeys.None) { OpenSelection(control); e.Handled = true; }
         else if (e.Key == Key.Back) { GoBack(); e.Handled = true; }
-        else if (e.Key == Key.F2 && sender is ListBox { SelectedItems.Count: 1 } control
+        else if (e.Key == Key.F2 && control.SelectedItems.Count == 1
                  && control.SelectedItem is FolderEntryViewModel vm)
         {
             BeginRename(vm);
             e.Handled = true;
         }
-        else if (e.Key == Key.Delete && sender is ListBox { SelectedItems.Count: > 0 } del)
+        else if (e.Key == Key.Delete && control.SelectedItems.Count > 0)
         {
-            var paths = del.SelectedItems.Cast<FolderEntryViewModel>().Select(v => v.FullPath).ToList();
-            Darask.Shell.ShellVerbService.Delete(paths, OwnerHwnd());
+            Darask.Shell.ShellVerbService.Delete(SelectedPaths(control), OwnerHwnd());
             e.Handled = true;
+        }
+        else if (ctrlShift && e.Key == Key.C) { CopyPathsToClipboard(SelectedPaths(control)); e.Handled = true; }
+        else if (ctrlShift && e.Key == Key.N) { CreateNewFolderAndRename(); e.Handled = true; }
+        else if (ctrl && e.Key == Key.C && control.SelectedItems.Count > 0)
+        {
+            Darask.Shell.ShellVerbService.Copy(SelectedPaths(control), OwnerHwnd());
+            e.Handled = true;
+        }
+        else if (ctrl && e.Key == Key.X && control.SelectedItems.Count > 0)
+        {
+            Darask.Shell.ShellVerbService.Cut(SelectedPaths(control), OwnerHwnd());
+            e.Handled = true;
+        }
+        else if (ctrl && e.Key == Key.V && _currentPath is not null && Darask.Shell.ShellVerbService.CanPaste())
+        {
+            Darask.Shell.ShellVerbService.PasteInto(_currentPath, OwnerHwnd());
+            e.Handled = true;
+        }
+    }
+
+    private static List<string> SelectedPaths(ListBox control) =>
+        control.SelectedItems.Cast<FolderEntryViewModel>().Select(v => v.FullPath).ToList();
+
+    /// <summary>Enter / 「開く」— フォルダーはナビゲート(複数時は新規タブ)、ファイルは既定アプリ起動。</summary>
+    private void OpenSelection(ListBox control)
+    {
+        var selected = control.SelectedItems.Cast<FolderEntryViewModel>().ToList();
+        if (selected.Count == 0) return;
+
+        if (selected.Count == 1)
+        {
+            if (selected[0].IsDirectory) Navigate(selected[0].FullPath);
+            else Darask.Shell.LaunchService.Open(selected[0].FullPath);
+            return;
+        }
+
+        // 大量選択で Enter を押した時の暴発ガード(エクスプローラーの「15 個を超える」警告準拠)。
+        if (selected.Count > 15
+            && MessageBox.Show($"選択した {selected.Count} 個の項目を一度に開きますか?", "darask-filer",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        foreach (var item in selected)
+        {
+            if (item.IsDirectory) OpenInNewTabRequested?.Invoke(item.FullPath);
+            else Darask.Shell.LaunchService.Open(item.FullPath);
+        }
+    }
+
+    /// <summary>エクスプローラーの「パスのコピー」— 各パスを引用符で囲み改行区切りでコピーする。</summary>
+    private static void CopyPathsToClipboard(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0) return;
+        try
+        {
+            Clipboard.SetText(string.Join(Environment.NewLine, paths.Select(p => $"\"{p}\"")));
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            // クリップボードが他プロセスにロックされている(CLIPBRD_E_CANT_OPEN)場合は諦める。
         }
     }
 
@@ -564,18 +781,24 @@ public partial class FolderView : UserControl
     }
 
     /// <summary>「新しいフォルダー」作成 → 一覧再取得 → 自動でインライン名前変更モードへ(エクスプローラー準拠)。</summary>
-    private async void CreateNewFolderAndRename()
+    private void CreateNewFolderAndRename() =>
+        _ = CreateNewItemAndRenameAsync(Darask.Shell.ShellVerbService.CreateNewFolder, "フォルダー");
+
+    private void CreateNewTextFileAndRename() =>
+        _ = CreateNewItemAndRenameAsync(Darask.Shell.ShellVerbService.CreateNewTextFile, "ファイル");
+
+    private async Task CreateNewItemAndRenameAsync(Func<string, string> create, string kind)
     {
         if (_currentPath is null) return;
 
         string newPath;
         try
         {
-            newPath = Darask.Shell.ShellVerbService.CreateNewFolder(_currentPath);
+            newPath = create(_currentPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show($"フォルダーの作成に失敗しました。\n{ex.Message}", "darask-filer", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show($"{kind}の作成に失敗しました。\n{ex.Message}", "darask-filer", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -634,14 +857,20 @@ public partial class FolderView : UserControl
         bool single = selected.Count == 1;
         IntPtr hwnd = OwnerHwnd();
 
-        if (single && selected[0].IsDirectory)
+        if (single)
         {
-            AddMenuItem(menu, "開く", () => Navigate(paths[0]));
+            if (selected[0].IsDirectory) AddMenuItem(menu, "開く", () => Navigate(paths[0]));
+            else AddMenuItem(menu, "開く", () => Darask.Shell.LaunchService.Open(paths[0]));
+            if (!selected[0].IsDirectory)
+            {
+                AddMenuItem(menu, "プログラムから開く...", () => Darask.Shell.LaunchService.ShowOpenWithDialog(paths[0]));
+            }
             menu.Items.Add(new Separator());
         }
 
         AddMenuItem(menu, "切り取り", () => Darask.Shell.ShellVerbService.Cut(paths, hwnd));
         AddMenuItem(menu, "コピー", () => Darask.Shell.ShellVerbService.Copy(paths, hwnd));
+        AddMenuItem(menu, "パスのコピー", () => CopyPathsToClipboard(paths));
         if (single)
         {
             AddMenuItem(menu, "ショートカットの作成", () => Darask.Shell.ShellVerbService.CreateShortcut(paths[0], _currentPath!));
@@ -676,12 +905,17 @@ public partial class FolderView : UserControl
 
         AddMenuItem(menu, "更新", Refresh);
         AddMenuItem(menu, "新しいフォルダー", CreateNewFolderAndRename);
+        AddMenuItem(menu, "新しいテキスト ドキュメント", CreateNewTextFileAndRename);
 
         if (Darask.Shell.ShellVerbService.CanPaste())
         {
             menu.Items.Add(new Separator());
             AddMenuItem(menu, "貼り付け", () => Darask.Shell.ShellVerbService.PasteInto(currentPath, OwnerHwnd()));
         }
+
+        menu.Items.Add(new Separator());
+        AddMenuItem(menu, "ターミナルで開く", () => Darask.Shell.LaunchService.OpenTerminal(currentPath));
+        AddMenuItem(menu, "パスのコピー", () => CopyPathsToClipboard([currentPath]));
 
         menu.Items.Add(new Separator());
         AddMenuItem(menu, "プロパティ", () => Darask.Shell.PropertiesService.ShowProperties([currentPath], OwnerHwnd()));

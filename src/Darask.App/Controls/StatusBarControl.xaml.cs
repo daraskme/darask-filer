@@ -20,6 +20,57 @@ public partial class StatusBarControl : UserControl
             : string.Empty;
     }
 
+    private string? _driveRoot;
+
+    /// <summary>現在パスのドライブ空き容量を表示する。DriveInfo は stat 系 I/O のため
+    /// UI スレッドで直接呼ばない(CLAUDE.md 規則1) — バックグラウンドで取得してディスパッチする。</summary>
+    public void UpdateDriveSpace(string currentPath)
+    {
+        string? root;
+        try
+        {
+            root = System.IO.Path.GetPathRoot(currentPath);
+        }
+        catch (ArgumentException)
+        {
+            root = null;
+        }
+
+        if (root is null or "" || !root.EndsWith('\\'))
+        {
+            // UNC 等ドライブレターのないパスは表示しない(DriveInfo 非対応)。
+            _driveRoot = null;
+            DriveSpaceText.Text = string.Empty;
+            return;
+        }
+
+        if (string.Equals(root, _driveRoot, StringComparison.OrdinalIgnoreCase)) return;
+        _driveRoot = root;
+
+        string captured = root;
+        _ = System.Threading.Tasks.Task.Run(() =>
+        {
+            string text;
+            try
+            {
+                var drive = new System.IO.DriveInfo(captured);
+                text = $"空き領域: {FormatSize(drive.AvailableFreeSpace)} / {FormatSize(drive.TotalSize)}";
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or ArgumentException or UnauthorizedAccessException)
+            {
+                text = string.Empty;
+            }
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (string.Equals(captured, _driveRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    DriveSpaceText.Text = text;
+                }
+            });
+        });
+    }
+
     private static string FormatSize(long bytes)
     {
         string[] units = ["B", "KB", "MB", "GB", "TB"];

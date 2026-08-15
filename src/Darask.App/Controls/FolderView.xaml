@@ -1,6 +1,7 @@
 <UserControl x:Class="Darask.App.FolderView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Darask.App"
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel">
     <Grid>
         <!-- CLAUDE.md 規則4: CanContentScroll=True + VirtualizationMode=Recycling + ScrollUnit=Pixel は必須セット -->
@@ -13,6 +14,8 @@
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
                   SelectionMode="Extended"
+                  IsTextSearchEnabled="True" IsTextSearchCaseSensitive="False"
+                  TextSearch.TextPath="DisplayName"
                   SelectionChanged="ListViewControl_SelectionChanged"
                   MouseDoubleClick="ListViewControl_MouseDoubleClick"
                   KeyDown="ListViewControl_KeyDown"
@@ -68,6 +71,8 @@
                  ScrollViewer.VerticalScrollBarVisibility="Disabled"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  SelectionMode="Extended"
+                 IsTextSearchEnabled="True" IsTextSearchCaseSensitive="False"
+                 TextSearch.TextPath="DisplayName"
                  SelectionChanged="ListViewControl_SelectionChanged"
                  MouseDoubleClick="ListViewControl_MouseDoubleClick"
                  KeyDown="ListViewControl_KeyDown"
@@ -87,11 +92,15 @@
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
             <ListBox.ItemTemplate>
-                <!-- v1 は固定 48px アイコン。Ctrl+ホイールでの連続ズーム(docs/01 §4)は
-                     複数サイズのテンプレート切替として post-M2 で拡張する。 -->
+                <!-- アイコンサイズは Ctrl+ホイールで可変(docs/01 §4)。FolderView の
+                     IconSize/IconItemWidth 依存関係プロパティに追従する。 -->
                 <DataTemplate>
-                    <StackPanel Width="88" Loaded="EntryRow_Loaded" Unloaded="EntryRow_Unloaded">
-                        <Image Source="{Binding Icon}" Width="48" Height="48" HorizontalAlignment="Center" />
+                    <StackPanel Width="{Binding IconItemWidth, RelativeSource={RelativeSource AncestorType=local:FolderView}}"
+                                Loaded="EntryRow_Loaded" Unloaded="EntryRow_Unloaded">
+                        <Image Source="{Binding Icon}"
+                               Width="{Binding IconSize, RelativeSource={RelativeSource AncestorType=local:FolderView}}"
+                               Height="{Binding IconSize, RelativeSource={RelativeSource AncestorType=local:FolderView}}"
+                               HorizontalAlignment="Center" />
                         <Grid>
                             <TextBlock x:Name="NameText" Text="{Binding DisplayName}" TextWrapping="Wrap" TextAlignment="Center"
                                        HorizontalAlignment="Center" />

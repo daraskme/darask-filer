@@ -70,8 +70,9 @@ public sealed class FolderEntryViewModel(FileSystemEntry entry, string parentPat
     private bool _iconLoaded;
 
     /// <summary>行が可視になった時に呼ぶ(FolderView の行 Loaded イベント)。バックグラウンドで
-    /// 拡張子アイコン(高速)→サムネイル(低優先度)の順に取得し UI スレッドへディスパッチする。</summary>
-    public void BeginLoadIcon()
+    /// 拡張子アイコン(高速)→サムネイル(低優先度)の順に取得し UI スレッドへディスパッチする。
+    /// <paramref name="thumbnailSize"/> はアイコングリッドのズームに応じた要求解像度。</summary>
+    public void BeginLoadIcon(int thumbnailSize = 64)
     {
         if (_iconLoaded) return;
         _iconLoaded = true;
@@ -128,7 +129,7 @@ public sealed class FolderEntryViewModel(FileSystemEntry entry, string parentPat
                 return;
             }
 
-            var thumb = ThumbnailService.GetThumbnail(fullPath, 64);
+            var thumb = ThumbnailService.GetThumbnail(fullPath, thumbnailSize);
             if (token.IsCancellationRequested || thumb is null) return;
             Application.Current?.Dispatcher.BeginInvoke(() =>
             {

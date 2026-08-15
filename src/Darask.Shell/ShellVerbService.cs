@@ -62,6 +62,22 @@ public static class ShellVerbService
         return fullPath;
     }
 
+    /// <summary>「新しいテキスト ドキュメント」を作成する(未使用の連番付き名前を自動選定)。</summary>
+    public static string CreateNewTextFile(string parentPath)
+    {
+        const string baseName = "新しいテキスト ドキュメント";
+        string name = baseName + ".txt";
+        int n = 2;
+        while (File.Exists(Path.Combine(parentPath, name)))
+        {
+            name = $"{baseName} ({n++}).txt";
+        }
+
+        string fullPath = Path.Combine(parentPath, name);
+        using (File.Create(fullPath)) { }
+        return fullPath;
+    }
+
     /// <summary>「ショートカットの作成」— 対象と同じフォルダーに .lnk を作成する。</summary>
     public static string CreateShortcut(string targetPath, string parentPath)
     {
