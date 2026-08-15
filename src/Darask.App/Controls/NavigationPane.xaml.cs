@@ -94,6 +94,25 @@ public partial class NavigationPane : UserControl
         }
     }
 
+    /// <summary>上部セクションと履歴は Auto 行のため、固定 MaxHeight のままだと合計が
+    /// ペイン高を超えたとき Grid が下端(履歴)を黙って画面外へクリップする(ユーザー報告
+    /// 「履歴の下の方が見えない」)。ペイン実高から両セクションへ上限を動的配分する。</summary>
+    private void NavigationPane_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        double h = e.NewSize.Height;
+        TopScroll.MaxHeight = Math.Max(140, h * 0.45);
+        HistoryList.MaxHeight = Math.Max(90, Math.Min(180, h * 0.30));
+    }
+
+    /// <summary>入れ子の ListBox はスクロール余地がなくてもホイールイベントを飲み込む
+    /// (WPF の既知挙動)。上部セクション上のホイールは外側 ScrollViewer へ委譲して
+    /// セクション全体が一体でスクロールするようにする。</summary>
+    private void InnerList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        e.Handled = true;
+        TopScroll.ScrollToVerticalOffset(TopScroll.VerticalOffset - e.Delta / 3.0);
+    }
+
     // ファイル読み込みは UI スレッドで行わない(CLAUDE.md 規則1)。
     private void LoadWorkspaces()
     {
