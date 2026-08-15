@@ -1,6 +1,6 @@
 namespace Darask.Enumeration;
 
-public enum SortKey { Name, Size, LastWriteTime, CreationTime }
+public enum SortKey { Name, Size, LastWriteTime, CreationTime, Type }
 public enum SortDirection { Ascending, Descending }
 
 /// <summary>
@@ -23,6 +23,7 @@ public static class EntrySorter
             SortKey.Size => (a, b) => a.SizeBytes.CompareTo(b.SizeBytes),
             SortKey.LastWriteTime => (a, b) => a.LastWriteTimeUtc.CompareTo(b.LastWriteTimeUtc),
             SortKey.CreationTime => (a, b) => a.CreationTimeUtc.CompareTo(b.CreationTimeUtc),
+            SortKey.Type => CompareByType,
             _ => throw new ArgumentOutOfRangeException(nameof(key)),
         };
 
@@ -44,6 +45,16 @@ public static class EntrySorter
         {
             Array.Sort(entries, comparison);
         }
+    }
+
+    /// <summary>「種類」列 — 拡張子(大文字小文字無視)→ 自然順名前の複合キー。
+    /// Span ベースで拡張子を切り出すため文字列アロケーションなし(規則9の精神に準拠)。</summary>
+    private static int CompareByType(FileSystemEntry a, FileSystemEntry b)
+    {
+        var extA = System.IO.Path.GetExtension(a.Name.AsSpan());
+        var extB = System.IO.Path.GetExtension(b.Name.AsSpan());
+        int c = extA.CompareTo(extB, StringComparison.OrdinalIgnoreCase);
+        return c != 0 ? c : NaturalSort.Compare(a.Name, b.Name);
     }
 
     /// <summary>
