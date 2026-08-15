@@ -104,12 +104,27 @@ public partial class NavigationPane : UserControl
             if (loaded.Count == 0) return;
             Dispatcher.BeginInvoke(() =>
             {
-                foreach (var ws in loaded) _workspaces.Add(ws);
+                // ロード完了前にユーザーが保存していた場合(稀)、単純 Add だと直前の
+                // Persist がディスク上の既存スペースを消してしまう — 既存分を先頭に
+                // マージし、メモリ側に先行分があればマージ結果を書き戻す(sol レビュー #6)。
+                bool userSavedFirst = _workspaces.Count > 0;
+                int insertAt = 0;
+                foreach (var ws in loaded)
+                {
+                    if (IndexOfWorkspace(ws.Name) < 0) _workspaces.Insert(insertAt++, ws);
+                }
+                if (userSavedFirst) PersistWorkspaces();
             });
         });
     }
 
-    private void PersistWorkspaces() => WorkspaceStore.Save(_workspaces);
+    // シリアライズと書き込みは UI スレッド外で(CLAUDE.md 規則1)。スナップショットを
+    // 先に取るので ObservableCollection への並行アクセスは起きない。
+    private void PersistWorkspaces()
+    {
+        var snapshot = _workspaces.ToList();
+        _ = System.Threading.Tasks.Task.Run(() => WorkspaceStore.Save(snapshot));
+    }
 
     /// <summary>現在のタブ構成を名前を付けて保存(同名があれば上書き)。</summary>
     private void SaveWorkspaceButton_Click(object sender, RoutedEventArgs e)

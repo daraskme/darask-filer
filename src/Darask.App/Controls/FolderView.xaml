@@ -102,8 +102,10 @@
                                Height="{Binding IconSize, RelativeSource={RelativeSource AncestorType=local:FolderView}}"
                                HorizontalAlignment="Center" />
                         <Grid>
+                            <!-- 行高を2行までにキャップ(MaxHeight+Trimming)。自前スクロールバーの
+                                 エクステント計算(IconSize+52 固定)が長い名前で崩れないようにする。 -->
                             <TextBlock x:Name="NameText" Text="{Binding DisplayName}" TextWrapping="Wrap" TextAlignment="Center"
-                                       HorizontalAlignment="Center" />
+                                       HorizontalAlignment="Center" MaxHeight="40" TextTrimming="CharacterEllipsis" />
                             <TextBox x:Name="NameEdit" Text="{Binding EditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Visibility="Collapsed" HorizontalAlignment="Stretch" TextAlignment="Center"
                                      IsVisibleChanged="RenameBox_IsVisibleChanged" KeyDown="RenameBox_KeyDown" LostFocus="RenameBox_LostFocus" />

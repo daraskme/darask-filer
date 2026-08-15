@@ -51,8 +51,13 @@ public partial class MainWindow : FluentWindow
     /// <summary>前回終了時のタブ構成を復元する。復元できるタブがなければ既定の1タブで開始。
     /// ファイル読み込みと存在チェックは stat 系 I/O(到達不能なネットワークパスでは秒単位で
     /// ブロックし得る)のため UI スレッドで行わない(CLAUDE.md 規則1)。</summary>
+    // 復元/作業スペース適用は await を挟むため、遅い方(オフライン UNC の存在チェック等)が
+    // 後から完了して新しい選択を上書きしないよう世代番号で守る(sol レビュー #5)。
+    private int _tabSetGeneration;
+
     private async void RestoreSession()
     {
+        int generation = ++_tabSetGeneration;
         var restored = await Task.Run(() =>
         {
             var session = SessionStore.Load();
@@ -60,6 +65,7 @@ public partial class MainWindow : FluentWindow
             var valid = session.Tabs.Where(t => System.IO.Directory.Exists(t.Path)).ToList();
             return valid.Count > 0 ? new TabSnapshot(valid, MapActiveIndex(session.Tabs, session.ActiveIndex, valid)) : null;
         });
+        if (generation != _tabSetGeneration) return;
 
         if (restored is null)
         {
@@ -99,11 +105,13 @@ public partial class MainWindow : FluentWindow
     /// 存在チェックは RestoreSession 同様バックグラウンドで行う(CLAUDE.md 規則1)。</summary>
     private async void ApplyWorkspace(Workspace workspace)
     {
+        int generation = ++_tabSetGeneration;
         var (valid, activeIndex) = await Task.Run(() =>
         {
             var tabs = workspace.Tabs.Where(t => System.IO.Directory.Exists(t.Path)).ToList();
             return (tabs, MapActiveIndex(workspace.Tabs, workspace.ActiveIndex, tabs));
         });
+        if (generation != _tabSetGeneration) return;
         if (valid.Count == 0)
         {
             System.Windows.MessageBox.Show("この作業スペースのフォルダーはいずれも存在しません。", "darask-filer",

@@ -338,10 +338,12 @@ public partial class FolderView : UserControl
         if (samePath && previousOffset > 0)
         {
             // ItemsSource 差し替え直後は仮想化パネルがまだレイアウトされておらずオフセット設定が
-            // 無視されるため、レイアウトパス完了後に復元する。
+            // 無視されるため、レイアウトパス完了後に復元する。コールバック実行前に再ナビゲート
+            // されていたら(ItemsSource が既に別物なら)何もしない(sol レビュー #7)。
             double offset = previousOffset;
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
             {
+                if (!ReferenceEquals(ActiveControl.ItemsSource, vms)) return;
                 if (_viewMode == FolderViewMode.IconGrid) ScrollIconGridTo(offset);
                 else FindDescendantScrollViewer(ListViewControl)?.ScrollToVerticalOffset(offset);
             });
@@ -358,6 +360,7 @@ public partial class FolderView : UserControl
             // プロパティ変更として反映させる。
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
             {
+                if (!ReferenceEquals(ActiveControl.ItemsSource, vms)) return; // 再ナビゲート済みなら破棄(sol レビュー #7)
                 ActiveControl.SelectedItem = restored;
                 ActiveControl.ScrollIntoView(restored);
                 restored.IsRenaming = true;
@@ -591,32 +594,40 @@ public partial class FolderView : UserControl
     }
 
     /// <summary>ズーム変更後、実体化済み(可視)の行だけサムネイルを新しい解像度で取り直す。
-    /// 未実体化の行はロード済みフラグをリセットするだけで、次に可視化された時に新解像度で読む。</summary>
+    /// 未実体化の行はロード済みフラグをリセットするだけで、次に可視化された時に新解像度で読む。
+    /// ContainerFromItem の全 VM 走査は 100k 件で UI ストールするため、仮想化パネルの
+    /// 実体化済み子要素だけを列挙する(sol レビュー #10)。</summary>
     private void ReloadRealizedIcons()
     {
         if (IconGridControl.ItemsSource is not IEnumerable<FolderEntryViewModel> vms) return;
 
+        foreach (var vm in vms) vm.CancelLoad(); // フラグリセットは全件(フィールド代入のみで安価)
+
+        var panel = FindDescendant<WpfToolkit.Controls.VirtualizingWrapPanel>(IconGridControl);
+        if (panel is null) return;
+
         int thumbSize = CurrentThumbnailSize;
         bool large = UseLargeIcons;
-        var generator = IconGridControl.ItemContainerGenerator;
-        foreach (var vm in vms)
+        int children = System.Windows.Media.VisualTreeHelper.GetChildrenCount(panel);
+        for (int i = 0; i < children; i++)
         {
-            vm.CancelLoad();
-            if (generator.ContainerFromItem(vm) is ListBoxItem)
+            if (System.Windows.Media.VisualTreeHelper.GetChild(panel, i) is ListBoxItem { DataContext: FolderEntryViewModel vm })
             {
                 vm.BeginLoadIcon(thumbSize, large);
             }
         }
     }
 
-    private static ScrollViewer? FindDescendantScrollViewer(DependencyObject root)
+    private static ScrollViewer? FindDescendantScrollViewer(DependencyObject root) => FindDescendant<ScrollViewer>(root);
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
     {
         int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
         for (int i = 0; i < count; i++)
         {
             var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
-            if (child is ScrollViewer sv) return sv;
-            if (FindDescendantScrollViewer(child) is { } found) return found;
+            if (child is T match) return match;
+            if (FindDescendant<T>(child) is { } found) return found;
         }
         return null;
     }
@@ -826,12 +837,13 @@ public partial class FolderView : UserControl
 
     private async Task CreateNewItemAndRenameAsync(Func<string, string> create, string kind)
     {
-        if (_currentPath is null) return;
+        if (_currentPath is not { } parentPath) return;
 
         string newPath;
         try
         {
-            newPath = create(_currentPath);
+            // 作成は I/O(遅い UNC ではブロックし得る)なので UI スレッドで行わない(規則1、sol レビュー #2)。
+            newPath = await Task.Run(() => create(parentPath));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

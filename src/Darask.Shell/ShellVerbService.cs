@@ -62,20 +62,27 @@ public static class ShellVerbService
         return fullPath;
     }
 
-    /// <summary>「新しいテキスト ドキュメント」を作成する(未使用の連番付き名前を自動選定)。</summary>
+    /// <summary>「新しいテキスト ドキュメント」を作成する(未使用の連番付き名前を自動選定)。
+    /// Exists→Create の間に他プロセスが同名を作ると File.Create は既存ファイルを黙って
+    /// 切り詰めてしまうため、FileMode.CreateNew(アトミック)+ 衝突時リトライで作る。</summary>
     public static string CreateNewTextFile(string parentPath)
     {
         const string baseName = "新しいテキスト ドキュメント";
-        string name = baseName + ".txt";
-        int n = 2;
-        while (File.Exists(Path.Combine(parentPath, name)))
+        for (int n = 1; n < 10_000; n++)
         {
-            name = $"{baseName} ({n++}).txt";
+            string name = n == 1 ? baseName + ".txt" : $"{baseName} ({n}).txt";
+            string fullPath = Path.Combine(parentPath, name);
+            try
+            {
+                using (new FileStream(fullPath, FileMode.CreateNew)) { }
+                return fullPath;
+            }
+            catch (IOException) when (File.Exists(fullPath))
+            {
+                // 既に存在(事前でも競合でも)— 次の連番へ。
+            }
         }
-
-        string fullPath = Path.Combine(parentPath, name);
-        using (File.Create(fullPath)) { }
-        return fullPath;
+        throw new IOException("空き連番が見つかりませんでした。");
     }
 
     /// <summary>「ショートカットの作成」— 対象と同じフォルダーに .lnk を作成する。</summary>
