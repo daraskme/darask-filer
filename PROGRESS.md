@@ -459,6 +459,20 @@ GitHub Actions での CI を実際にグリーンにするところまでを実�
   M3 で再検討)、OpenAs_RunDLL の引用符付け(rundll32 はカンマ以降を素通しするため
   引用符はパスを壊す)。
 
+### 第3ラウンド: アイコン・単一 exe 配布・履歴クリッピング修正(v0.1.2)
+- **アプリアイコン**: GDI+ で 256px 描画(フォルダー + 金スパーク)→ 16〜256px の
+  PNG 圧縮 ICO にパック(生成スクリプトの教訓: **BOM なし UTF-8 の .ps1 + 日本語コメントは
+  powershell.exe が誤読する** — 本ファイル CI/CD 節の既知の罠が再発)。`ApplicationIcon` で配線。
+  ユーザー承認済み。
+- **単一 exe 配布**: `PublishSingleFile` + `IncludeAllContentForSelfExtract` + 圧縮で
+  74.7MB の DaraskFiler.exe 1 ファイルに(**WPF は `IncludeNativeLibrariesForSelfExtraction`
+  だけでは wpfgfx_cor3 等 5 DLL が外に残る** — `IncludeAllContentForSelfExtract=true` が必要。
+  初回起動時に %TEMP%\.net へ自己展開)。ランタイム無し環境で起動確認済み。
+- **履歴の下端クリッピング修正**(ユーザー報告): ピン留めセクション(最大440px)+ 履歴が
+  どちらも Auto 行で、合計がペイン高を超えると Grid が履歴の下端を画面外へ黙ってクリップ
+  していた。ペイン実高から動的配分(上部45%/履歴30%)+ 入れ子 ListBox のホイールを外側
+  ScrollViewer へ委譲。
+
 ### 開発環境の注意(再発)
 - **.NET 10 SDK がまたシステムから消えていた**(Program Files 側は 8.0.29/9.0.18 ランタイムのみ)。
   dotnet-install.ps1 で `%LOCALAPPDATA%\dotnet-10` に 10.0.301 を再インストール。開発ビルドの
