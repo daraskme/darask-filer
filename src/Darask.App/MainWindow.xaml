@@ -33,7 +33,8 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Padding="10,7" Margin="0,0,4,0" CornerRadius="6"
-                                MouseLeftButtonUp="TabChip_MouseLeftButtonUp">
+                                MouseLeftButtonUp="TabChip_MouseLeftButtonUp"
+                                MouseDown="TabChip_MouseDown">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Background" Value="Transparent" />

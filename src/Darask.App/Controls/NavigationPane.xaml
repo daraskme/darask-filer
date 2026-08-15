@@ -18,6 +18,42 @@
                 </StackPanel>
             </Border>
 
+            <!-- 作業スペース: プロジェクトごとのタブ構成を名前付きで保存/切替(ユーザー要望機能)。 -->
+            <Grid Margin="0,0,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="作業スペース" Opacity="0.6" Margin="4,0,0,0" FontSize="12" VerticalAlignment="Center" />
+                <ui:Button Grid.Column="1" Padding="5,1" ToolTip="現在のタブ構成を作業スペースとして保存"
+                           Click="SaveWorkspaceButton_Click">
+                    <ui:SymbolIcon Symbol="Add16" FontSize="11" />
+                </ui:Button>
+            </Grid>
+            <ListBox x:Name="WorkspaceList" BorderThickness="0" Background="Transparent" Margin="0,0,0,10"
+                     PreviewMouseLeftButtonUp="WorkspaceList_PreviewMouseLeftButtonUp"
+                     MouseRightButtonUp="WorkspaceList_MouseRightButtonUp">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="4,6" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Grid.Column="0" Symbol="Briefcase24" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
             <TextBlock Text="クイックアクセス" Opacity="0.6" Margin="4,0,0,4" FontSize="12" />
             <ListBox x:Name="QuickAccessList" BorderThickness="0" Background="Transparent"
                      PreviewMouseLeftButtonUp="QuickAccessList_PreviewMouseLeftButtonUp"

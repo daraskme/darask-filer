@@ -1,0 +1,28 @@
+<ui:FluentWindow x:Class="Darask.App.NameInputDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="darask-filer" Height="170" Width="380"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        WindowCornerPreference="Round"
+        ShowInTaskbar="False">
+    <Grid Margin="16,8,16,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="PromptText" Grid.Row="0" Text="名前を入力してください" Margin="0,8,0,8" />
+        <!-- 日本語 IME での入力を想定するテキスト入力サーフェス(CLAUDE.md 規則16 — 実機検証対象)。 -->
+        <ui:TextBox x:Name="NameBox" Grid.Row="1" KeyDown="NameBox_KeyDown" />
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <ui:Button x:Name="OkButton" Content="OK" Appearance="Primary" MinWidth="80" Click="OkButton_Click" />
+            <ui:Button Content="キャンセル" MinWidth="80" Margin="8,0,0,0" Click="CancelButton_Click" />
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

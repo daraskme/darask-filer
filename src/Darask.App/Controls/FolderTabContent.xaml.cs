@@ -40,6 +40,11 @@ public partial class FolderTabContent : UserControl, ITabContent
         ? (System.IO.Path.GetFileName(p.TrimEnd('\\')) is { Length: > 0 } name ? name : p)
         : "新しいタブ";
 
+    /// <summary>セッション/作業スペース保存用のビュー状態(docs 外のユーザー要望機能)。</summary>
+    public FolderViewMode ViewMode => MainFolderView.ViewMode;
+    public double IconSize => MainFolderView.IconSize;
+    public void SetIconZoom(double size) => MainFolderView.SetIconZoom(size);
+
     public void Navigate(string path) => MainFolderView.Navigate(path);
     public void Refresh() => MainFolderView.Refresh();
     public void FocusAddressEditMode() => AddressBarControl.FocusEditMode();

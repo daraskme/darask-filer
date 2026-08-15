@@ -18,16 +18,105 @@ public partial class NavigationPane : UserControl
 
     public event Action<string>? PathSelected;
     public event Action? RecycleBinRequested;
+    public event Action<Workspace>? WorkspaceSelected;
+
+    /// <summary>現在のタブ構成のスナップショットを返すデリゲート(MainWindow が設定する)。</summary>
+    public Func<TabSnapshot>? WorkspaceSnapshotProvider { get; set; }
 
     private readonly ObservableCollection<QuickAccessNode> _quickAccess = [];
     private readonly ObservableCollection<HistoryNode> _history = [];
+    private readonly ObservableCollection<Workspace> _workspaces = [];
 
     public NavigationPane()
     {
         InitializeComponent();
         LoadDrives();
+        LoadWorkspaces();
         LoadQuickAccess();
         LoadHistory();
+    }
+
+    private void LoadWorkspaces()
+    {
+        foreach (var ws in WorkspaceStore.Load()) _workspaces.Add(ws);
+        WorkspaceList.ItemsSource = _workspaces;
+    }
+
+    private void PersistWorkspaces() => WorkspaceStore.Save(_workspaces);
+
+    /// <summary>現在のタブ構成を名前を付けて保存(同名があれば上書き)。</summary>
+    private void SaveWorkspaceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (WorkspaceSnapshotProvider is not { } provider) return;
+
+        var snapshot = provider();
+        if (snapshot.Tabs.Count == 0) return;
+
+        string? name = NameInputDialog.Show(Window.GetWindow(this)!, "作業スペース名を入力してください");
+        if (name is null) return;
+
+        var workspace = new Workspace(name, snapshot.Tabs, snapshot.ActiveIndex);
+        int existing = IndexOfWorkspace(name);
+        if (existing >= 0) _workspaces[existing] = workspace;
+        else _workspaces.Add(workspace);
+        PersistWorkspaces();
+    }
+
+    private int IndexOfWorkspace(string name)
+    {
+        for (int i = 0; i < _workspaces.Count; i++)
+        {
+            if (string.Equals(_workspaces[i].Name, name, StringComparison.OrdinalIgnoreCase)) return i;
+        }
+        return -1;
+    }
+
+    private void WorkspaceList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is FrameworkElement { DataContext: Workspace ws })
+        {
+            WorkspaceSelected?.Invoke(ws);
+        }
+    }
+
+    private void WorkspaceList_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not FrameworkElement { DataContext: Workspace ws }) return;
+
+        var menu = new ContextMenu();
+        MenuTheme.ApplyOpaque(menu);
+        MenuTheme.AddItem(menu, "開く", () => WorkspaceSelected?.Invoke(ws));
+        MenuTheme.AddItem(menu, "現在のタブ構成で上書き", () =>
+        {
+            if (WorkspaceSnapshotProvider is not { } provider) return;
+            var snapshot = provider();
+            if (snapshot.Tabs.Count == 0) return;
+            int index = IndexOfWorkspace(ws.Name);
+            if (index >= 0)
+            {
+                _workspaces[index] = new Workspace(ws.Name, snapshot.Tabs, snapshot.ActiveIndex);
+                PersistWorkspaces();
+            }
+        });
+        MenuTheme.AddItem(menu, "名前の変更", () =>
+        {
+            string? newName = NameInputDialog.Show(Window.GetWindow(this)!, "新しい名前を入力してください", ws.Name);
+            if (newName is null || string.Equals(newName, ws.Name, StringComparison.Ordinal)) return;
+            int index = IndexOfWorkspace(ws.Name);
+            if (index >= 0)
+            {
+                _workspaces[index] = ws with { Name = newName };
+                PersistWorkspaces();
+            }
+        });
+        MenuTheme.AddItem(menu, "削除", () =>
+        {
+            if (_workspaces.Remove(ws)) PersistWorkspaces();
+        });
+
+        WorkspaceList.ContextMenu = menu;
+        menu.IsOpen = true;
+        e.Handled = true;
     }
 
     private void LoadQuickAccess()
